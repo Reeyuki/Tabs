@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Totally Accurate Battle Simulator</title>
+    <style>
+        body {
+            margin: 0;
+            background: #050505;
+            color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #u {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #l {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #f {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            cursor: pointer;
+            background: rgba(30, 30, 30, 0.8);
+            border: 1px solid #444;
+            padding: 8px 16px;
+            border-radius: 4px;
+            z-index: 20;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        #f:hover {
+            background: rgba(50, 50, 50, 0.9);
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/gh/reeyuki/tabs@main/Build/UnityLoader.js"></script>
+</head>
+
+<body>
+    <div id="l">Loading assets... 0%</div>
+    <div id="f" onclick="u.SetFullscreen(1)">Fullscreen</div>
+    <div id="u"></div>
+    <script>
+        const base = "https://cdn.jsdelivr.net/gh/reeyuki/tabs@main/";
+        const dC = 78, wC = 3;
+        let u, n = 0, t = dC + wC, blobs = {};
+        const up = (v, m) => {
+            document.getElementById('l').innerText = m + "... " + Math.round(v * 100) + "%";
+        };
+        const ld = async (s, c) => {
+            const r = await Promise.all([...Array(c)].map((_, i) =>
+                fetch(base + "Build/tabs." + s + (i < 10 ? "0" + i : i))
+                    .then(x => x.arrayBuffer())
+                    .then(a => { n++; up(n / t, "Loading assets"); return a; })
+            ));
+            return new Blob(r).arrayBuffer();
+        };
+        const shim = () => {
+            const ox = XMLHttpRequest.prototype.open, sx = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function (m, url) { this._u = url; return ox.apply(this, arguments); };
+            XMLHttpRequest.prototype.send = function () {
+                const p = new URL(this._u, window.location.href).pathname;
+                for (const k in blobs) if (p.endsWith(k)) {
+                    setTimeout(() => {
+                        Object.defineProperty(this, 'status', { value: 200 });
+                        Object.defineProperty(this, 'readyState', { value: 4 });
+                        Object.defineProperty(this, 'response', { value: blobs[k] });
+                        this.dispatchEvent(new Event('load'));
+                    }, 1);
+                    return;
+                }
+                return sx.apply(this, arguments);
+            };
+        };
+        (async () => {
+            const [dB, wB] = await Promise.all([ld("data", dC), ld("wasm", wC)]);
+            blobs["tabs.data.unityweb"] = dB;
+            blobs["tabs.wasm.code.unityweb"] = wB;
+            shim();
+            u = UnityLoader.instantiate("u", base + "Build/tabs.json", {
+                onProgress: (inst, v) => {
+                    if (v < 1) up(v, "Initializing");
+                    else document.getElementById('l').style.display = 'none';
+                }
+            });
+        })();
+    </script>
+</body>
+
+</html>
